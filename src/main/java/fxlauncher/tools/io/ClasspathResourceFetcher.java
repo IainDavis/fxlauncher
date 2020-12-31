@@ -8,27 +8,24 @@ import fxlauncher.LauncherMain;
 import fxlauncher.except.FXLauncherException;
 
 /**
- * Implementation of {@link FileFetcher} that retrieves a resource from the
- * classpath by its name
+ * Implementation of {@link FileFetcher} that retrieves a resource from the classpath by its name
  *
  * @author idavis1
  */
 public class ClasspathResourceFetcher implements FileFetcher {
 
-	private final static Logger log = Logger.getLogger(ClasspathResourceFetcher.class.getName());
+  private static final Logger log = Logger.getLogger(ClasspathResourceFetcher.class.getName());
 
-	private final String resourceName;
+  private final String resourceName;
 
-	public ClasspathResourceFetcher(String resourceName) {
-		this.resourceName = resourceName;
-	}
+  public ClasspathResourceFetcher(String resourceName) {
+    this.resourceName = resourceName;
+  }
 
-	/**
-	 * Retrieves the resource named in {@code resourceName} from the classpath
-	 */
-	@Override
-	public Optional<InputStream> fetch() throws FXLauncherException {
-		log.fine("Fetching resource " + resourceName);
-		return Optional.ofNullable(LauncherMain.class.getResourceAsStream(resourceName));
-	}
+  /** Retrieves the resource named in {@code resourceName} from the classpath */
+  @Override
+  public Optional<InputStream> fetch() throws FXLauncherException {
+    log.fine("Fetching resource " + resourceName);
+    return Optional.ofNullable(LauncherMain.class.getResourceAsStream(resourceName));
+  }
 }

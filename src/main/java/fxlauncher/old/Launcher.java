@@ -27,271 +27,283 @@ import javafx.stage.StageStyle;
 
 @SuppressWarnings("unchecked")
 public class Launcher extends Application {
-	private static final Logger log = Logger.getLogger("Launcher");
+  private static final Logger log = Logger.getLogger("Launcher");
 
-	private Application app;
-	private Stage primaryStage;
-	private Stage stage;
-	private UIProvider uiProvider;
-	private StackPane root;
+  private Application app;
+  private Stage primaryStage;
+  private Stage stage;
+  private UIProvider uiProvider;
+  private StackPane root;
 
-	private final AbstractLauncher superLauncher = new AbstractLauncher<Application>() {
-		@Override
-		protected Parameters getParameters() {
-			return Launcher.this.getParameters();
-		}
+  private final AbstractLauncher superLauncher =
+      new AbstractLauncher<Application>() {
+        @Override
+        protected Parameters getParameters() {
+          return Launcher.this.getParameters();
+        }
 
-		@Override
-		protected void updateProgress(double progress) {
-			Platform.runLater(() -> uiProvider.updateProgress(progress));
-		}
+        @Override
+        protected void updateProgress(double progress) {
+          Platform.runLater(() -> uiProvider.updateProgress(progress));
+        }
 
-		@Override
-		protected void createApplication(Class<Application> appClass) {
-			runAndWait(() -> {
-				try {
-					if (Application.class.isAssignableFrom(appClass)) {
-						app = appClass.newInstance();
-					} else {
-						throw new IllegalArgumentException(String.format(
-								"Supplied appClass %s was not a subclass of javafx.application.Application!",
-								appClass));
-					}
-				} catch (Throwable t) {
-					reportError("Error creating app class", t);
-				}
-			});
-		}
+        @Override
+        protected void createApplication(Class<Application> appClass) {
+          runAndWait(
+              () -> {
+                try {
+                  if (Application.class.isAssignableFrom(appClass)) {
+                    app = appClass.newInstance();
+                  } else {
+                    throw new IllegalArgumentException(
+                        String.format(
+                            "Supplied appClass %s was not a subclass of javafx.application.Application!",
+                            appClass));
+                  }
+                } catch (Throwable t) {
+                  reportError("Error creating app class", t);
+                }
+              });
+        }
 
-		@Override
-		protected void reportError(String title, Throwable error) {
-			log.log(Level.WARNING, title, error);
+        @Override
+        protected void reportError(String title, Throwable error) {
+          log.log(Level.WARNING, title, error);
 
-			Platform.runLater(() -> {
-				Alert alert = new Alert(Alert.AlertType.ERROR);
-				alert.setTitle(title);
-				alert.setHeaderText(String.format("%s\ncheck the logfile 'fxlauncher.log, usually in the %s directory",
-						title, System.getProperty("java.io.tmpdir")));
-//            alert.setHeaderText(title+"\nCheck the logfile usually in the "+System.getProperty("java.io.tmpdir") + "directory");
-				alert.getDialogPane().setPrefWidth(600);
+          Platform.runLater(
+              () -> {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle(title);
+                alert.setHeaderText(
+                    String.format(
+                        "%s\ncheck the logfile 'fxlauncher.log, usually in the %s directory",
+                        title, System.getProperty("java.io.tmpdir")));
+                //            alert.setHeaderText(title+"\nCheck the logfile usually in the
+                // "+System.getProperty("java.io.tmpdir") + "directory");
+                alert.getDialogPane().setPrefWidth(600);
 
-				ByteArrayOutputStream out = new ByteArrayOutputStream();
-				PrintWriter writer = new PrintWriter(out);
-				error.printStackTrace(writer);
-				writer.close();
-				TextArea text = new TextArea(out.toString());
-				alert.getDialogPane().setContent(text);
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                PrintWriter writer = new PrintWriter(out);
+                error.printStackTrace(writer);
+                writer.close();
+                TextArea text = new TextArea(out.toString());
+                alert.getDialogPane().setContent(text);
 
-				alert.showAndWait();
-				Platform.exit();
-			});
-		}
+                alert.showAndWait();
+                Platform.exit();
+              });
+        }
 
-		@Override
-		protected void setupClassLoader(ClassLoader classLoader) {
-			FXMLLoader.setDefaultClassLoader(classLoader);
-			Platform.runLater(() -> Thread.currentThread().setContextClassLoader(classLoader));
-		}
+        @Override
+        protected void setupClassLoader(ClassLoader classLoader) {
+          FXMLLoader.setDefaultClassLoader(classLoader);
+          Platform.runLater(() -> Thread.currentThread().setContextClassLoader(classLoader));
+        }
+      };
 
-	};
+  /**
+   * Check if a new version is available and return the manifest for the new version or null if no
+   * update.
+   *
+   * <p>Note that updates will only be detected if the application was actually launched with
+   * FXLauncher.
+   *
+   * @return The manifest for the new version if available
+   * @throws IOException if manifest not found
+   */
+  public static FXManifest checkForUpdate() throws IOException {
+    // We might be called even when FXLauncher wasn't used to start the application
+    if (AbstractLauncher.manifest == null) return null;
+    FXManifest manifest = FXManifest.load(URI.create(AbstractLauncher.manifest.uri + "/app.xml"));
+    return manifest.equals(AbstractLauncher.manifest) ? null : manifest;
+  }
 
-	/**
-	 * Check if a new version is available and return the manifest for the new
-	 * version or null if no update.
-	 * <p>
-	 * Note that updates will only be detected if the application was actually
-	 * launched with FXLauncher.
-	 *
-	 * @return The manifest for the new version if available
-	 * @throws IOException if manifest not found
-	 */
-	public static FXManifest checkForUpdate() throws IOException {
-		// We might be called even when FXLauncher wasn't used to start the application
-		if (AbstractLauncher.manifest == null)
-			return null;
-		FXManifest manifest = FXManifest.load(URI.create(AbstractLauncher.manifest.uri + "/app.xml"));
-		return manifest.equals(AbstractLauncher.manifest) ? null : manifest;
-	}
+  /**
+   * Initialize the UI Provider by looking for an UIProvider inside the launcher or fallback to the
+   * default UI.
+   *
+   * <p>A custom implementation must be embedded inside the launcher jar, and
+   * /META-INF/services/fxlauncher.UIProvider must point to the new implementation class.
+   *
+   * <p>You must do this manually/in your build right around the "embed manifest" step.
+   */
+  @Override
+  public void init() throws Exception {
+    Iterator<UIProvider> providers = ServiceLoader.load(UIProvider.class).iterator();
+    uiProvider = providers.hasNext() ? providers.next() : new DefaultUIProvider();
+  }
 
-	/**
-	 * Initialize the UI Provider by looking for an UIProvider inside the launcher
-	 * or fallback to the default UI.
-	 * <p>
-	 * A custom implementation must be embedded inside the launcher jar, and
-	 * /META-INF/services/fxlauncher.UIProvider must point to the new implementation
-	 * class.
-	 * <p>
-	 * You must do this manually/in your build right around the "embed manifest"
-	 * step.
-	 */
-	@Override
-	public void init() throws Exception {
-		Iterator<UIProvider> providers = ServiceLoader.load(UIProvider.class).iterator();
-		uiProvider = providers.hasNext() ? providers.next() : new DefaultUIProvider();
-	}
+  @Override
+  public void start(Stage primaryStage) throws Exception {
+    this.primaryStage = primaryStage;
+    stage = new Stage(StageStyle.UNDECORATED);
+    root = new StackPane();
+    final boolean[] filesUpdated = new boolean[1];
 
-	@Override
-	public void start(Stage primaryStage) throws Exception {
-		this.primaryStage = primaryStage;
-		stage = new Stage(StageStyle.UNDECORATED);
-		root = new StackPane();
-		final boolean[] filesUpdated = new boolean[1];
+    Scene scene = new Scene(root);
+    stage.setScene(scene);
 
-		Scene scene = new Scene(root);
-		stage.setScene(scene);
+    superLauncher.setupLogFile();
+    superLauncher.checkSSLIgnoreflag();
+    this.uiProvider.init(stage);
+    root.getChildren().add(uiProvider.createLoader());
 
-		superLauncher.setupLogFile();
-		superLauncher.checkSSLIgnoreflag();
-		this.uiProvider.init(stage);
-		root.getChildren().add(uiProvider.createLoader());
+    stage.show();
 
-		stage.show();
+    new Thread(
+            () -> {
+              Thread.currentThread().setName("FXLauncher-Thread");
+              try {
+                superLauncher.updateManifest();
+                createUpdateWrapper();
+                filesUpdated[0] = superLauncher.syncFiles();
+              } catch (Exception ex) {
+                log.log(
+                    Level.WARNING,
+                    String.format("Error during %s phase", superLauncher.getPhase()),
+                    ex);
+                if (superLauncher.checkIgnoreUpdateErrorSetting()) {
+                  superLauncher.reportError(
+                      String.format("Error during %s phase", superLauncher.getPhase()), ex);
+                  System.exit(1);
+                }
+              }
 
-		new Thread(() -> {
-			Thread.currentThread().setName("FXLauncher-Thread");
-			try {
-				superLauncher.updateManifest();
-				createUpdateWrapper();
-				filesUpdated[0] = superLauncher.syncFiles();
-			} catch (Exception ex) {
-				log.log(Level.WARNING, String.format("Error during %s phase", superLauncher.getPhase()), ex);
-				if (superLauncher.checkIgnoreUpdateErrorSetting()) {
-					superLauncher.reportError(String.format("Error during %s phase", superLauncher.getPhase()), ex);
-					System.exit(1);
-				}
-			}
+              try {
+                superLauncher.createApplicationEnvironment();
+                launchAppFromManifest(filesUpdated[0]);
+              } catch (Exception ex) {
+                superLauncher.reportError(
+                    String.format("Error during %s phase", superLauncher.getPhase()), ex);
+              }
+            })
+        .start();
+  }
 
-			try {
-				superLauncher.createApplicationEnvironment();
-				launchAppFromManifest(filesUpdated[0]);
-			} catch (Exception ex) {
-				superLauncher.reportError(String.format("Error during %s phase", superLauncher.getPhase()), ex);
-			}
+  private void launchAppFromManifest(boolean showWhatsnew) throws Exception {
+    superLauncher.setPhase("Application Environment Prepare");
 
-		}).start();
-	}
+    try {
+      initApplication();
+    } catch (Throwable ex) {
+      superLauncher.reportError("Error during app init", ex);
+    }
+    superLauncher.setPhase("Application Start");
+    log.info("Show whats new dialog? " + showWhatsnew);
 
-	private void launchAppFromManifest(boolean showWhatsnew) throws Exception {
-		superLauncher.setPhase("Application Environment Prepare");
+    runAndWait(
+        () -> {
+          try {
+            if (showWhatsnew && superLauncher.getManifest().whatsNewPage != null)
+              showWhatsNewDialog(superLauncher.getManifest().whatsNewPage);
 
-		try {
-			initApplication();
-		} catch (Throwable ex) {
-			superLauncher.reportError("Error during app init", ex);
-		}
-		superLauncher.setPhase("Application Start");
-		log.info("Show whats new dialog? " + showWhatsnew);
+            // Lingering update screen will close when primary stage is shown
+            if (superLauncher.getManifest().lingeringUpdateScreen) {
+              primaryStage
+                  .showingProperty()
+                  .addListener(
+                      observable -> {
+                        if (stage.isShowing()) stage.close();
+                      });
+            } else {
+              stage.close();
+            }
 
-		runAndWait(() -> {
-			try {
-				if (showWhatsnew && superLauncher.getManifest().whatsNewPage != null)
-					showWhatsNewDialog(superLauncher.getManifest().whatsNewPage);
+            startApplication();
+          } catch (Throwable ex) {
+            superLauncher.reportError("Failed to start application", ex);
+          }
+        });
+  }
 
-				// Lingering update screen will close when primary stage is shown
-				if (superLauncher.getManifest().lingeringUpdateScreen) {
-					primaryStage.showingProperty().addListener(observable -> {
-						if (stage.isShowing())
-							stage.close();
-					});
-				} else {
-					stage.close();
-				}
+  private void showWhatsNewDialog(String whatsNewURL) {
+    WebView view = new WebView();
+    view.getEngine().load(whatsNewURL);
+    Alert alert = new Alert(Alert.AlertType.INFORMATION);
+    alert.setTitle("What's new");
+    alert.setHeaderText("New in this update");
+    alert.getDialogPane().setContent(view);
+    alert.showAndWait();
+  }
 
-				startApplication();
-			} catch (Throwable ex) {
-				superLauncher.reportError("Failed to start application", ex);
-			}
-		});
-	}
+  public static void main(String[] args) {
+    launch(args);
+  }
 
-	private void showWhatsNewDialog(String whatsNewURL) {
-		WebView view = new WebView();
-		view.getEngine().load(whatsNewURL);
-		Alert alert = new Alert(Alert.AlertType.INFORMATION);
-		alert.setTitle("What's new");
-		alert.setHeaderText("New in this update");
-		alert.getDialogPane().setContent(view);
-		alert.showAndWait();
-	}
+  private void createUpdateWrapper() {
+    superLauncher.setPhase("Update Wrapper Creation");
 
-	public static void main(String[] args) {
-		launch(args);
-	}
+    Platform.runLater(
+        () -> {
+          Parent updater = uiProvider.createUpdater(superLauncher.getManifest());
+          root.getChildren().clear();
+          root.getChildren().add(updater);
+        });
+  }
 
-	private void createUpdateWrapper() {
-		superLauncher.setPhase("Update Wrapper Creation");
+  @Override
+  public void stop() throws Exception {
+    if (app != null) app.stop();
+  }
 
-		Platform.runLater(() -> {
-			Parent updater = uiProvider.createUpdater(superLauncher.getManifest());
-			root.getChildren().clear();
-			root.getChildren().add(updater);
-		});
-	}
+  private void initApplication() throws Exception {
+    if (app != null) {
+      app.init();
+    }
+  }
 
-	@Override
-	public void stop() throws Exception {
-		if (app != null)
-			app.stop();
-	}
+  private void startApplication() throws Exception {
+    if (app != null) {
+      final LauncherParams params =
+          new LauncherParams(getParameters(), superLauncher.getManifest());
+      app.getParameters().getNamed().putAll(params.getNamed());
+      app.getParameters().getRaw().addAll(params.getRaw());
+      app.getParameters().getUnnamed().addAll(params.getUnnamed());
 
-	private void initApplication() throws Exception {
-		if (app != null) {
-			app.init();
-		}
-	}
+      PlatformImpl.setApplicationName(app.getClass());
+      superLauncher.setPhase("Application Init");
+      app.start(primaryStage);
+    } else {
+      // Start any executable jar (i.E. Spring Boot);
+      String firstFile = superLauncher.getManifest().files.get(0).file;
+      log.info(String.format("No app class defined, starting first file (%s)", firstFile));
+      Path cacheDir = superLauncher.getManifest().resolveCacheDir(getParameters().getNamed());
+      String command = String.format("java -jar %s/%s", cacheDir.toAbsolutePath(), firstFile);
+      log.info(String.format("Execute command '%s'", command));
+      Runtime.getRuntime().exec(command);
+    }
+  }
 
-	private void startApplication() throws Exception {
-		if (app != null) {
-			final LauncherParams params = new LauncherParams(getParameters(), superLauncher.getManifest());
-			app.getParameters().getNamed().putAll(params.getNamed());
-			app.getParameters().getRaw().addAll(params.getRaw());
-			app.getParameters().getUnnamed().addAll(params.getUnnamed());
+  /**
+   * Runs the specified {@link Runnable} on the JavaFX application thread and waits for completion.
+   *
+   * @param action the {@link Runnable} to run
+   * @throws NullPointerException if {@code action} is {@code null}
+   */
+  void runAndWait(Runnable action) {
+    if (action == null) throw new NullPointerException("action");
 
-			PlatformImpl.setApplicationName(app.getClass());
-			superLauncher.setPhase("Application Init");
-			app.start(primaryStage);
-		} else {
-			// Start any executable jar (i.E. Spring Boot);
-			String firstFile = superLauncher.getManifest().files.get(0).file;
-			log.info(String.format("No app class defined, starting first file (%s)", firstFile));
-			Path cacheDir = superLauncher.getManifest().resolveCacheDir(getParameters().getNamed());
-			String command = String.format("java -jar %s/%s", cacheDir.toAbsolutePath(), firstFile);
-			log.info(String.format("Execute command '%s'", command));
-			Runtime.getRuntime().exec(command);
-		}
-	}
+    // run synchronously on JavaFX thread
+    if (Platform.isFxApplicationThread()) {
+      action.run();
+      return;
+    }
 
-	/**
-	 * Runs the specified {@link Runnable} on the JavaFX application thread and
-	 * waits for completion.
-	 *
-	 * @param action the {@link Runnable} to run
-	 * @throws NullPointerException if {@code action} is {@code null}
-	 */
-	void runAndWait(Runnable action) {
-		if (action == null)
-			throw new NullPointerException("action");
+    // queue on JavaFX thread and wait for completion
+    final CountDownLatch doneLatch = new CountDownLatch(1);
+    Platform.runLater(
+        () -> {
+          try {
+            action.run();
+          } finally {
+            doneLatch.countDown();
+          }
+        });
 
-		// run synchronously on JavaFX thread
-		if (Platform.isFxApplicationThread()) {
-			action.run();
-			return;
-		}
-
-		// queue on JavaFX thread and wait for completion
-		final CountDownLatch doneLatch = new CountDownLatch(1);
-		Platform.runLater(() -> {
-			try {
-				action.run();
-			} finally {
-				doneLatch.countDown();
-			}
-		});
-
-		try {
-			doneLatch.await();
-		} catch (InterruptedException e) {
-			// ignore exception
-		}
-	}
+    try {
+      doneLatch.await();
+    } catch (InterruptedException e) {
+      // ignore exception
+    }
+  }
 }
