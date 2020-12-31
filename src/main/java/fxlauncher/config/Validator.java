@@ -11,31 +11,39 @@ import java.util.regex.Pattern;
  */
 public interface Validator extends Predicate<String> {
 
-	static public String getExpected(Validator validator) {
-		if (validator == Validator.BOOL)
-			return "boolean";
-		if (validator == Validator.URL)
-			return "URL";
-		return "String";
-	}
+  public static String getExpected(Validator validator) {
+    if (validator == Validator.BOOL) return "boolean";
+    if (validator == Validator.URL) return "URL";
+    return "String";
+  }
 
-	// OWASP-supplied URL pattern-matching regexp
-	static final String URL_REGEX = "^((((https?|ftps?|gopher|telnet|nntp)://)|(mailto:|news:))"
-			+ "(%[0-9A-Fa-f]{2}|[-()_.!~*';/?:@&=+$,A-Za-z0-9])+)" + "([).!';/?:,][[:blank:]])?$";
+  // OWASP-supplied URL pattern-matching regexp
+  static final String URL_REGEX =
+      "^((((https?|ftps?|gopher|telnet|nntp)://)|(mailto:|news:))"
+          + "(%[0-9A-Fa-f]{2}|[-()_.!~*';/?:@&=+$,A-Za-z0-9])+)"
+          + "([).!';/?:,][[:blank:]])?$";
 
-	static final Pattern URL_PATTERN = Pattern.compile(URL_REGEX);
+  static final Pattern URL_PATTERN = Pattern.compile(URL_REGEX);
 
-	public static final Validator DEFAULT = string -> true;
+  public static final Validator DEFAULT = string -> (string != null && !string.trim().equals(""));
 
-	public static final Validator BOOL = string -> {
-		Logger.getLogger(Validator.BOOL.getClass().getName())
-				.finer(String.format("validating as boolean: '%s'", string));
-		return string == null ? false : string.equalsIgnoreCase("true") || string.equalsIgnoreCase("false");
-	};
+  public static final Validator BOOL =
+      string -> {
+        Logger.getLogger(Validator.BOOL.getClass().getName())
+            .finer(String.format("validating as boolean: '%s'", string == null ? "null" : string));
+        // assume flag-behavior for boolean... if it's explicitly set by name-only, it's true
+        return (string == null || string.trim().equals(""))
+            ? true
+            : string.equalsIgnoreCase("true") || string.equalsIgnoreCase("false");
+      };
 
-	public static final Validator URL = string -> {
-		Logger.getLogger(Validator.URL.getClass().getName()).finer(String.format("validating as URL: '%s'", string));
+  public static final Validator URL =
+      string -> {
+        Logger.getLogger(Validator.URL.getClass().getName())
+            .finer(String.format("validating as URL: '%s'", string));
 
-		return string == null ? false : URL_PATTERN.matcher(string).matches();
-	};
+        return (string == null || string.equals(""))
+            ? false
+            : URL_PATTERN.matcher(string).matches();
+      };
 }
