@@ -4,8 +4,8 @@ import java.io.InputStream;
 import java.util.Optional;
 import java.util.logging.Logger;
 
+import fxlauncher.LauncherMain;
 import fxlauncher.except.FXLauncherException;
-import fxlauncher.old.Launcher;
 
 /**
  * Implementation of {@link FileFetcher} that retrieves a resource from the
@@ -29,6 +29,6 @@ public class ClasspathResourceFetcher implements FileFetcher {
 	@Override
 	public Optional<InputStream> fetch() throws FXLauncherException {
 		log.fine("Fetching resource " + resourceName);
-		return Optional.ofNullable(Launcher.class.getResourceAsStream(resourceName));
+		return Optional.ofNullable(LauncherMain.class.getResourceAsStream(resourceName));
 	}
 }
