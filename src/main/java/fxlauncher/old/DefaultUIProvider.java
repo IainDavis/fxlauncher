@@ -10,33 +10,31 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 public class DefaultUIProvider implements UIProvider {
-	private ProgressBar progressBar;
+  private ProgressBar progressBar;
 
-	public Parent createLoader() {
-		StackPane root = new StackPane(new ProgressIndicator());
-		root.setPrefSize(200, 80);
-		root.setPadding(new Insets(10));
-		return root;
-	}
+  public Parent createLoader() {
+    StackPane root = new StackPane(new ProgressIndicator());
+    root.setPrefSize(200, 80);
+    root.setPadding(new Insets(10));
+    return root;
+  }
 
-	public Parent createUpdater(FXManifest manifest) {
-		progressBar = new ProgressBar();
-		progressBar.setStyle(manifest.progressBarStyle);
+  public Parent createUpdater(FXManifest manifest) {
+    progressBar = new ProgressBar();
+    progressBar.setStyle(manifest.progressBarStyle);
 
-		Label label = new Label(manifest.updateText);
-		label.setStyle(manifest.updateLabelStyle);
+    Label label = new Label(manifest.updateText);
+    label.setStyle(manifest.updateLabelStyle);
 
-		VBox wrapper = new VBox(label, progressBar);
-		wrapper.setStyle(manifest.wrapperStyle);
+    VBox wrapper = new VBox(label, progressBar);
+    wrapper.setStyle(manifest.wrapperStyle);
 
-		return wrapper;
-	}
+    return wrapper;
+  }
 
-	public void updateProgress(double progress) {
-		progressBar.setProgress(progress);
-	}
+  public void updateProgress(double progress) {
+    progressBar.setProgress(progress);
+  }
 
-	public void init(Stage stage) {
-
-	}
+  public void init(Stage stage) {}
 }

@@ -9,8 +9,7 @@ import fxlauncher.except.FXLauncherException;
  * Standardized interface for fetching resources via I/O
  *
  * @author idavis1
- *
  */
 public interface FileFetcher {
-	public Optional<InputStream> fetch() throws FXLauncherException;
+  public Optional<InputStream> fetch() throws FXLauncherException;
 }
